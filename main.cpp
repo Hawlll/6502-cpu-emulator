@@ -11,6 +11,8 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
     uint8_t Z_FLAG; // zero flag
     uint8_t C_FLAG; // carry flag (did operation result in needing another bit)
     uint8_t V_FLAG; // overflow flag (did operation result in outside signed bit range)
+    uint8_t cycles;
+    uint8_t instruction;
 
     void Initialize() {
         PC = 0x8000;
@@ -22,6 +24,17 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         Z_FLAG = 0b00000010;
         C_FLAG = 0b00000001;
         V_FLAG = 0b01000000;
+        instruction = 0;
+        cycles = 0;
+    }
+
+    void Clock() {
+        if (cycles > 0) {
+            cycles--;
+        }
+        else {
+            throw std::runtime_error("Out of cycles for instruction: " + std::format("{:#X}\n", (int)instruction));
+        }
     }
 
     uint8_t Fetch(uint16_t Address) {
@@ -66,8 +79,6 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         uint8_t operand_2_sign = (operand_2 & (1 << 7)) > 0;
         uint8_t reg_sign = (reg & (1 << 7)) > 0;
 
-        std::cout << (int)operand_1_sign << " " << (int)operand_2_sign << " " << (int)reg_sign << std::endl;
-
         if ((operand_1_sign == operand_2_sign) && (operand_1_sign != reg_sign)) {
             status |= V_FLAG;
         }
@@ -76,40 +87,53 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         }
     }
 
-    void Execute() {
+    void Execute(uint8_t cycls) {
+
+        cycles = cycls;
 
         uint8_t opcode = Fetch(PC);
+        instruction = opcode;
+
         PC++;
+        Clock();
 
         switch (opcode) {
             case 0xA9: // LDA (Load into Accumulator register) - take immediate 1 byte after opcode and place into accumulator register
                 A = Fetch(PC);
                 PC++;
+                Clock();
+
                 SetZFLAG(A);
                 SetNFLAG(A);
                 break;
             case 0x8D: { // STA (Store Accumulator) - take value from accumulator and store into 16 bit address formed with next two bytes
                 uint8_t low = Fetch(PC);
                 PC++;
+                Clock();
 
                 uint8_t high = Fetch(PC);
                 PC++;
+                Clock();
 
                 uint16_t address = (high << 8) | low;
 
                 Store(address, A);
+                Clock();
 
                 break;
             }
             case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
                 X = Fetch(PC);
                 PC++;
+                Clock();
+
                 SetZFLAG(X);
                 SetNFLAG(X);
                 break;
             case 0x69: { // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
                 uint8_t immediate = Fetch(PC);
                 PC++;
+                Clock();
 
                 uint8_t carry = (status & C_FLAG) > 0;
 
@@ -141,7 +165,7 @@ int main()
     // inline instruction - testing LDA
     cpu.mem[0x8000] = 0xA9;
     cpu.mem[0x8001] = 0x7F;
-    cpu.Execute();
+    cpu.Execute(2);
 
     // inline instruction - testing STA
     //cpu.mem[0x8002] = 0x8D;
@@ -157,7 +181,7 @@ int main()
     // inline instruction - testing ADC
     cpu.mem[0x8002] = 0x69;
     cpu.mem[0x8003] = 0x01;
-    cpu.Execute();
+    cpu.Execute(2);
 
     uint8_t value = cpu.mem[0x9000];
 
