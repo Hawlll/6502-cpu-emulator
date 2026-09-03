@@ -71,6 +71,9 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0x69: // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
                 return 2;
                 break;
+            case 0x4C: // JMP (Jump) - Update PC to address formed by next two bytes
+                return 3;
+                break;
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)opcode));
                 break;
@@ -213,6 +216,22 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
 
             }
+
+            case 0x4C: // JMP (Jump) - Update PC to address formed by next two bytes
+
+                switch (cycles) {
+                    case 2:
+                        address = Fetch(PC);
+                        PC++;
+                        break;
+                    case 1:
+                        address |= (Fetch(PC) << 8);
+                        PC = address;
+                        break;
+                    default:
+                        break;
+                }
+                break;
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)instruction));
                 break;
@@ -319,6 +338,17 @@ int main()
     cpu.mem[0x8010] = 0x70;
     cpu.Clock();
     cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+
+    //inline instruction - testing jmp
+    cpu.mem[0x8011] = 0x4C;
+    cpu.mem[0x8012] = 0x00;
+    cpu.mem[0x8013] = 0x80;
+    cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+
     cpu.Clock();
     cpu.Clock();
 
