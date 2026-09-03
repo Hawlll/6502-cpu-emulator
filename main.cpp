@@ -52,13 +52,16 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0xA9: // LDA (Load into Accumulator register) - take immediate 1 byte after opcode and place into accumulator register
                 return 2;
                 break;
+            case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
+                return 2;
+                break;
+            case 0xA0: // LDY (load immediate into Y register) - take immediate value and load into y register
+                return 2;
+                break;
             case 0x8D: { // STA (Store Accumulator) - take value from accumulator and store into 16 bit address formed with next two bytes
                 return 4;
                 break;
             }
-            case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
-                return 2;
-                break;
             case 0x69: { // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
                 return 2;
                 break;
@@ -89,6 +92,35 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
 
 
+            case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
+
+                switch (cycles) {
+                    case 1:
+                        X = Fetch(PC);
+                        SetZFLAG(X);
+                        SetNFLAG(X);
+                        PC++;
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+
+            case 0xA0: // LDY (load immediate into Y register) - take immediate value and load into y register
+
+                switch (cycles) {
+                    case 1:
+                        Y = Fetch(PC);
+                        SetZFLAG(Y);
+                        SetNFLAG(Y);
+                        PC++;
+                        break;
+                    default:
+                        break;
+                }
+
+
             case 0x8D: { // STA (Store Accumulator) - take value from accumulator and store into 16 bit address formed with next two bytes
 
                 switch (cycles) {
@@ -109,21 +141,6 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
 
             }
-
-
-            case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
-
-                switch (cycles) {
-                    case 1:
-                        X = Fetch(PC);
-                        SetZFLAG(X);
-                        SetNFLAG(X);
-                        PC++;
-                        break;
-                    default:
-                        break;
-                }
-                break;
 
 
             case 0x69: { // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
@@ -234,6 +251,12 @@ int main()
     // inline instruction - testing ADC
     cpu.mem[0x8007] = 0x69;
     cpu.mem[0x8008] = 0x01;
+    cpu.Clock();
+    cpu.Clock();
+
+    //inline instruction - testing LDY
+    cpu.mem[0x8009] = 0xA0;
+    cpu.mem[0x800A] = 0x80;
     cpu.Clock();
     cpu.Clock();
 
