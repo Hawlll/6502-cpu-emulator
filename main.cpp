@@ -17,16 +17,17 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
     void Initialize() {
         PC = 0x8000;
-        A = 0;
-        X = 0;
-        Y = 0;
+        A = 0x00;
+        X = 0x00;
+        Y = 0x00;
         status = 0b00000000;
         N_FLAG = 0b10000000;
         Z_FLAG = 0b00000010;
         C_FLAG = 0b00000001;
         V_FLAG = 0b01000000;
-        instruction = 0;
-        cycles = 0;
+        instruction = 0x00;
+        cycles = 0x00;
+        address = 0x0000;
     }
 
     void Clock() {
@@ -58,14 +59,18 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0xA0: // LDY (load immediate into Y register) - take immediate value and load into y register
                 return 2;
                 break;
-            case 0x8D: { // STA (Store Accumulator) - take value from accumulator and store into 16 bit address formed with next two bytes
+            case 0x8D: // STA (Store Accumulator) - take value from accumulator and store into 16 bit address formed with next two bytes
                 return 4;
                 break;
-            }
-            case 0x69: { // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
+            case 0x8E: // STX (Store X register) - take value from X register and store into 16 bit address formed with next two bytes
+                return 4;
+                break;
+            case 0x8C: // STY (Store Y register) - take value from Y register and store into 16 bit address formed with next two bytes
+                return 4;
+                break;
+            case 0x69: // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
                 return 2;
                 break;
-            }
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)opcode));
                 break;
@@ -119,6 +124,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                     default:
                         break;
                 }
+                break;
 
 
             case 0x8D: { // STA (Store Accumulator) - take value from accumulator and store into 16 bit address formed with next two bytes
@@ -141,6 +147,44 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
 
             }
+
+            case 0x8E: // STX (Store X register) - take value from X register and store into 16 bit address formed with next two bytes
+
+                switch (cycles) {
+                    case 3:
+                        address = Fetch(PC);
+                        PC++;
+                        break;
+                    case 2:
+                        address |= (Fetch(PC) << 8);
+                        PC++;
+                        break;
+                    case 1:
+                        Store(address, X);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case 0x8C: // STY (Store Y register) - take value from Y register and store into 16 bit address formed with next two bytes
+
+                switch (cycles) {
+                    case 3:
+                        address = Fetch(PC);
+                        PC++;
+                        break;
+                    case 2:
+                        address |= (Fetch(PC) << 8);
+                        PC++;
+                        break;
+                    case 1:
+                        Store(address, Y);
+                        break;
+                    default:
+                        break;
+                }
+                break;
 
 
             case 0x69: { // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
@@ -260,6 +304,24 @@ int main()
     cpu.Clock();
     cpu.Clock();
 
+    //inline instruction - testing STX
+    cpu.mem[0x800B] = 0x8E;
+    cpu.mem[0x800C] = 0x01;
+    cpu.mem[0x800D] = 0x70;
+    cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+
+    // inline instruction - testing STY
+    cpu.mem[0x800E] = 0x8C;
+    cpu.mem[0x800F] = 0x02;
+    cpu.mem[0x8010] = 0x70;
+    cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+
     std::cout << "Accumlator Register: " << (int)cpu.A << std::endl;
     std::cout << "X register: " << (int)cpu.X << std::endl;
     std::cout << "Y register: " << (int)cpu.Y << std::endl;
@@ -273,7 +335,7 @@ int main()
         std::cout << on;
     }
     std::cout << std::endl;
-    std::cout << (int)cpu.mem[0x9000] << std::endl;
+    std::cout << (int)cpu.mem[0x7002] << std::endl;
 
     return 0;
 }
