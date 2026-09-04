@@ -88,6 +88,14 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                     return 2;
                 }
                 break;
+            case 0xD0: // BNE (Branch if not equal) - Increment PC by immediate signed offset if zero flag is clear
+                if ((status & Z_FLAG) < 1) {
+                    return 3;
+                }
+                else {
+                    return 2;
+                }
+                break;
             case 0xAA: // TAX (Transfer A to X) - Load the value in the accumualtor into the X register
                 return 2;
                 break;
@@ -312,6 +320,37 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0xD0: // BNE (Branch if not equal) - Increment PC by immediate signed offset if zero flag is clear
+
+                switch (cycles) {
+                    case 2: {
+                        uint8_t imm = Fetch(PC);
+                        uint8_t sign = imm & (1 << 7);
+                        uint8_t magnitude = ~imm + 1;
+
+                        if (sign) {
+                            address = (PC+1) - magnitude;
+                        }
+                        else {
+                            address = (PC+1) + imm;
+                        }
+                        PC++;
+                        break;
+                    }
+                    case 1:
+                        if ((status & Z_FLAG) < 1) {
+                            PC = address;
+                        }
+                        else {
+                            PC++;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+
             case 0xAA: // TAX (Transfer A to X) - Load the value in the accumualtor into the X register
 
                 switch (cycles) {
@@ -481,6 +520,13 @@ int main()
 
     cpu.mem[0x809A] = 0xC9;
     cpu.mem[0x809B] = 0x05;
+    cpu.Clock();
+    cpu.Clock();
+
+    //inline instruction - testing BNE
+    cpu.mem[0x809C] = 0xD0;
+    cpu.mem[0x809D] = 0x02;
+    cpu.Clock();
     cpu.Clock();
     cpu.Clock();
 
