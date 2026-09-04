@@ -71,6 +71,9 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0x69: // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
                 return 2;
                 break;
+            case 0xC9: // CMP (Compare Accumulator) - compare accumulator value with immediate
+                return 2;
+                break;
             case 0xE8: // INX (Increment X) - Add one to the X register
                 return 2;
                 break;
@@ -231,6 +234,25 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
             }
 
+            case 0xC9: // CMP (Compare Accumulator) - compare accumulator value with immediate
+
+                switch (cycles) {
+                    case 1: {
+                        uint8_t imm = Fetch(PC);
+                        uint8_t result = A - imm;
+
+                        SetCFLAG(A >= imm);
+                        SetNFLAG(result);
+                        SetZFLAG(result);
+                        PC++;
+                        break;
+                    }
+                    default:
+                        break;
+
+                }
+                break;
+
             case 0xE8: // INX (Increment X) - Add one to the X register
 
                 switch (cycles) {
@@ -342,6 +364,15 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         }
     }
 
+    void SetCFLAG(bool value) {
+        if (value) {
+            status |= C_FLAG;
+        }
+        else {
+            status &= ~C_FLAG;
+        }
+    }
+
     void SetVFLAG(uint8_t operand_1, uint8_t operand_2, uint8_t reg) {
         uint8_t operand_1_sign = (operand_1 & (1 << 7)) > 0;
         uint8_t operand_2_sign = (operand_2 & (1 << 7)) > 0;
@@ -436,8 +467,20 @@ int main()
     cpu.Clock();
 
     cpu.mem[0x808C] = 0xF0;
-    cpu.mem[0x808D] = 0xFB;
+    cpu.mem[0x808D] = 0x0A;
     cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+
+
+    // inline instruction - testing CMP
+    cpu.mem[0x8098] = 0xA9;
+    cpu.mem[0x8099] = 0x03;
+    cpu.Clock();
+    cpu.Clock();
+
+    cpu.mem[0x809A] = 0xC9;
+    cpu.mem[0x809B] = 0x05;
     cpu.Clock();
     cpu.Clock();
 
