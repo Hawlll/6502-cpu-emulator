@@ -71,8 +71,14 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0x69: // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
                 return 2;
                 break;
+            case 0xE8: // INX (Increment X) - Add one to the X register
+                return 2;
+                break;
             case 0x4C: // JMP (Jump) - Update PC to address formed by next two bytes
                 return 3;
+                break;
+            case 0xAA: // TAX (Transfer A to X) - Load the value in the accumualtor into the X register
+                return 2;
                 break;
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)opcode));
@@ -217,6 +223,19 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
             }
 
+            case 0xE8: // INX (Increment X) - Add one to the X register
+
+                switch (cycles) {
+                    case 1:
+                        X += 1;
+                        SetZFLAG(X);
+                        SetNFLAG(X);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
             case 0x4C: // JMP (Jump) - Update PC to address formed by next two bytes
 
                 switch (cycles) {
@@ -232,6 +251,18 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                         break;
                 }
                 break;
+
+            case 0xAA: // TAX (Transfer A to X) - Load the value in the accumualtor into the X register
+
+                switch (cycles) {
+                    case 1:
+                        X = A;
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)instruction));
                 break;
@@ -341,14 +372,21 @@ int main()
     cpu.Clock();
     cpu.Clock();
 
-    //inline instruction - testing jmp
+    //inline instruction - testing JMP
     cpu.mem[0x8011] = 0x4C;
-    cpu.mem[0x8012] = 0x00;
+    cpu.mem[0x8012] = 0x88;
     cpu.mem[0x8013] = 0x80;
     cpu.Clock();
     cpu.Clock();
     cpu.Clock();
 
+    // inline instruction - testing TAX
+    cpu.mem[0x8088] = 0xAA;
+    cpu.Clock();
+    cpu.Clock();
+
+    // inline instruction - testing INX
+    cpu.mem[0x8089] = 0xE8;
     cpu.Clock();
     cpu.Clock();
 
