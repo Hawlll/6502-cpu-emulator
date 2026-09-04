@@ -77,6 +77,14 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0x4C: // JMP (Jump) - Update PC to address formed by next two bytes
                 return 3;
                 break;
+            case 0xF0: // BEQ (Branch if equal) - Increment PC by immediate signed offset if zero flag is on
+                if (status & Z_FLAG) {
+                    return 3;
+                }
+                else {
+                    return 2;
+                }
+                break;
             case 0xAA: // TAX (Transfer A to X) - Load the value in the accumualtor into the X register
                 return 2;
                 break;
@@ -252,11 +260,43 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0xF0: // BEQ (Branch if equal) - Increment PC by immediate signed offset if zero flag is on
+
+                switch (cycles) {
+                    case 2: {
+                        uint8_t imm = Fetch(PC);
+                        uint8_t sign = imm & (1 << 7);
+                        uint8_t magnitude = ~imm + 1;
+
+                        if (sign) {
+                            address = (PC+1) - magnitude;
+                        }
+                        else {
+                            address = (PC+1) + imm;
+                        }
+                        PC++;
+                        break;
+                    }
+                    case 1:
+                        if (status & Z_FLAG) {
+                            PC = address;
+                        }
+                        else {
+                            PC++;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
             case 0xAA: // TAX (Transfer A to X) - Load the value in the accumualtor into the X register
 
                 switch (cycles) {
                     case 1:
                         X = A;
+                        SetZFLAG(X);
+                        SetNFLAG(X);
                         break;
                     default:
                         break;
@@ -387,6 +427,17 @@ int main()
 
     // inline instruction - testing INX
     cpu.mem[0x8089] = 0xE8;
+    cpu.Clock();
+    cpu.Clock();
+
+    cpu.mem[0x808A] = 0xA9;
+    cpu.mem[0x808B] = 0x00;
+    cpu.Clock();
+    cpu.Clock();
+
+    cpu.mem[0x808C] = 0xF0;
+    cpu.mem[0x808D] = 0xFB;
+    cpu.Clock();
     cpu.Clock();
     cpu.Clock();
 
