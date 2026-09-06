@@ -6,15 +6,25 @@ int main()
     CPU cpu;
     cpu.Initialize();
 
-    cpu.mem[0x8000] = 0xA9;
-    cpu.mem[0x8001] = 0x05;
+    cpu.mem[0x8000] = 0x20;
+    cpu.mem[0x8001] = 0x00;
+    cpu.mem[0x8002] = 0x90;
+    cpu.mem[0x9000] = 0x60;
+    cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
     cpu.Clock();
     cpu.Clock();
 
-    cpu.mem[0x8002] = 0x48;
     cpu.Clock();
     cpu.Clock();
     cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+    cpu.Clock();
+
+    std::cout << std::format("{:#X}", (int)cpu.PC) << std::endl;
 
     //inline instruction - loop
     /*loop

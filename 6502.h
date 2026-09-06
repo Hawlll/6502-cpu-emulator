@@ -88,6 +88,12 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0x4C: // JMP (Jump) - Update PC to address formed by next two bytes
                 return 3;
                 break;
+            case 0x20: // JSR (Jump to Sub routine) - Push PC to stack and set PC to address formed by next two bytes
+                return 6;
+                break;
+            case 0x60: // RTS (Return from subroutine) - pull 16 bit address from stack and set PC to it
+                return 6;
+                break;
             case 0xF0: // BEQ (Branch if equal) - Increment PC by immediate signed offset if zero flag is on
                 if (status & Z_FLAG) {
                     return 3;
@@ -338,6 +344,57 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0x20: // JSR (Jump to Sub routine) - Push PC to stack and set PC to address formed by next two bytes
+
+                switch (cycles) {
+                    case 5: {
+                        uint16_t result_addr = PC + 1;
+                        Push(result_addr >> 8);
+                        Push(result_addr & 0x00FF);
+                        break;
+                    }
+                    case 4:
+                        address_latch = Fetch(PC);
+                        PC++;
+                        break;
+                    case 3:
+                        address_latch |= (Fetch(PC) << 8);
+                        PC++;
+                        break;
+                    case 2:
+                        PC = address_latch;
+                        break;
+                    case 1:
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case 0x60: // RTS (Return from subroutine) - pull 16 bit address from stack and set PC to it
+
+                switch (cycles) {
+
+                    case 5:
+                        address_latch = Pull();
+                        break;
+                    case 4:
+                        address_latch |= (Pull() & 0x00FF) << 8;
+                        break;
+                    case 3:
+                        PC = address_latch;
+                        PC++;
+                        break;
+                    case 2:
+                        break;
+                    case 1:
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+
             case 0xF0: // BEQ (Branch if equal) - Increment PC by immediate signed offset if zero flag is on
 
                 switch (cycles) {
@@ -416,9 +473,9 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 2:
-                        Push(A);
                         break;
                     case 1:
+                        Push(A); // push happens on third cycle
                         break;
                     default:
                         break;
@@ -429,13 +486,13 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 3:
-                        A = Pull();
                         break;
                     case 2:
-                        SetZFLAG(A);
-                        SetNFLAG(A);
                         break;
                     case 1:
+                        A = Pull(); // pull happens on 4th cycle
+                        SetZFLAG(A);
+                        SetNFLAG(A);
                         break;
                     default:
                         break;
