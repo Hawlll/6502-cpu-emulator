@@ -12,6 +12,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
     uint8_t Z_FLAG; // zero flag
     uint8_t C_FLAG; // carry flag (did operation result in needing another bit)
     uint8_t V_FLAG; // overflow flag (did operation result in outside signed bit range)
+    uint8_t B_FLAG; // // break flag
     uint8_t cycles; // emulator representation, not programmatically visible, used to track cycles for instruction
     uint8_t instruction_latch; // emulator representation, not programmatically visible, used to store current opcode
     uint16_t address_latch; // emulator representation, not programmatically visible, used to store constructed address
@@ -26,6 +27,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         Z_FLAG = 0b00000010;
         C_FLAG = 0b00000001;
         V_FLAG = 0b01000000;
+        B_FLAG = 0b00010000;
         instruction_latch = 0x00;
         cycles = 0x00;
         address_latch = 0x0000;
@@ -73,6 +75,12 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0x69: // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
                 return 2;
                 break;
+            case 0x18: // CLC (Clear Carry) - Clears the carry flag in status register
+                return 2;
+                break;
+            case 0x38: // SEC (Set Carry) - Sets the carry flag in status register
+                return 2;
+                break;
             case 0xC9: // CMP (Compare Accumulator) - compare accumulator value with immediate
                 return 2;
                 break;
@@ -117,6 +125,12 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 return 3;
                 break;
             case 0x68: // PLA (Pull A) - Pulls value from stack into the accumulator
+                return 4;
+                break;
+            case 0x08:  // PHP (Push Processor Status) - Push processor status to stack
+                return 3;
+                break;
+            case 0x28: // PLP (Pull Processor Status) - Pull processor status from stack and load into status register
                 return 4;
                 break;
             default:
@@ -261,6 +275,29 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
 
             }
+
+            case 0x18: // CLC (Clear Carry) - Clears the carry flag in status register
+
+                switch (cycles) {
+                    case 1:
+                        SetCFLAG(false);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case 0x38: // SEC (Set Carry) - Sets the carry flag in status register
+
+                switch (cycles) {
+                    case 1:
+                        SetCFLAG(true);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
 
             case 0xC9: // CMP (Compare Accumulator) - compare accumulator value with immediate
 
@@ -499,6 +536,34 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0x08: // PHP (Push Processor Status) - Push processor status to stack
+
+                switch (cycles) {
+                    case 2:
+                        break;
+                    case 1:
+                        SetBFLAG(true);
+                        Push(status);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case 0x28: // PLP (Pull Processor Status) - Pull processor status from stack and load into status register
+
+                switch (cycles) {
+                    case 3:
+                        break;
+                    case 2:
+                        break;
+                    case 1:
+                        status = Pull() & 0b11001111; // ignore break and extra bit
+                        break;
+                    default:
+                        break;
+                }
+                break;
 
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)instruction_latch));
@@ -568,6 +633,15 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         }
         else {
             status &= ~V_FLAG;
+        }
+    }
+
+    void SetBFLAG(bool value) {
+        if (value) {
+            status |= B_FLAG;
+        }
+        else {
+            status &= ~B_FLAG;
         }
     }
 };
