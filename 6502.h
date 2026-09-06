@@ -1,19 +1,20 @@
 #include <iostream>
 
 struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. little endian multi-byte ordering (low => High)
-    uint8_t mem[65536];
-    uint16_t PC;
-    uint8_t A;
-    uint8_t X;
-    uint8_t Y;
-    uint8_t status;
+    uint8_t mem[65536]; // Memory (64KB)
+    uint16_t PC; // Program Counter
+    uint8_t SP; // Stack pointer, just an offset of page 1
+    uint8_t A; // Accumulator register
+    uint8_t X; // Index X register
+    uint8_t Y; // Index Y register
+    uint8_t status; // Processor status register
     uint8_t N_FLAG; // negative flag
     uint8_t Z_FLAG; // zero flag
     uint8_t C_FLAG; // carry flag (did operation result in needing another bit)
     uint8_t V_FLAG; // overflow flag (did operation result in outside signed bit range)
-    uint8_t cycles;
-    uint8_t instruction;
-    uint16_t address;
+    uint8_t cycles; // emulator representation, not programmatically visible, used to track cycles for instruction
+    uint8_t instruction_latch; // emulator representation, not programmatically visible, used to store current opcode
+    uint16_t address_latch; // emulator representation, not programmatically visible, used to store constructed address
 
     void Initialize() {
         PC = 0x8000;
@@ -25,9 +26,10 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         Z_FLAG = 0b00000010;
         C_FLAG = 0b00000001;
         V_FLAG = 0b01000000;
-        instruction = 0x00;
+        instruction_latch = 0x00;
         cycles = 0x00;
-        address = 0x0000;
+        address_latch = 0x0000;
+        SP = 0xFD;
     }
 
     void Clock() {
@@ -37,7 +39,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         else {
             uint8_t opcode = Fetch(PC);
             cycles = Decode(opcode);
-            instruction = opcode;
+            instruction_latch = opcode;
             PC++;
         }
         cycles--;
@@ -105,6 +107,12 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0xAA: // TAX (Transfer A to X) - Load the value in the accumualtor into the X register
                 return 2;
                 break;
+            case 0x48: // PHA (Push A) - Push accumulator value to stack
+                return 3;
+                break;
+            case 0x68: // PLA (Pull A) - Pulls value from stack into the accumulator
+                return 4;
+                break;
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)opcode));
                 break;
@@ -114,7 +122,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
     void Execute() {
 
-        switch (instruction) {
+        switch (instruction_latch) {
 
             case 0xA9: // LDA (Load into Accumulator register) - take immediate 1 byte after opcode and place into accumulator register
 
@@ -165,15 +173,15 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 3:
-                        address = Fetch(PC); // low byte
+                        address_latch = Fetch(PC); // low byte
                         PC++;
                         break;
                     case 2:
-                        address |= Fetch(PC) << 8; // high byte
+                        address_latch |= Fetch(PC) << 8; // high byte
                         PC++;
                         break;
                     case 1:
-                        Store(address, A);
+                        Store(address_latch, A);
                         break;
                     default:
                         break;
@@ -186,15 +194,15 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 3:
-                        address = Fetch(PC);
+                        address_latch = Fetch(PC);
                         PC++;
                         break;
                     case 2:
-                        address |= (Fetch(PC) << 8);
+                        address_latch |= (Fetch(PC) << 8);
                         PC++;
                         break;
                     case 1:
-                        Store(address, X);
+                        Store(address_latch, X);
                         break;
                     default:
                         break;
@@ -205,15 +213,15 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 3:
-                        address = Fetch(PC);
+                        address_latch = Fetch(PC);
                         PC++;
                         break;
                     case 2:
-                        address |= (Fetch(PC) << 8);
+                        address_latch |= (Fetch(PC) << 8);
                         PC++;
                         break;
                     case 1:
-                        Store(address, Y);
+                        Store(address_latch, Y);
                         break;
                     default:
                         break;
@@ -318,12 +326,12 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 2:
-                        address = Fetch(PC);
+                        address_latch = Fetch(PC);
                         PC++;
                         break;
                     case 1:
-                        address |= (Fetch(PC) << 8);
-                        PC = address;
+                        address_latch |= (Fetch(PC) << 8);
+                        PC = address_latch;
                         break;
                     default:
                         break;
@@ -339,17 +347,17 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                         uint8_t magnitude = ~imm + 1;
 
                         if (sign) {
-                            address = (PC+1) - magnitude;
+                            address_latch = (PC+1) - magnitude;
                         }
                         else {
-                            address = (PC+1) + imm;
+                            address_latch = (PC+1) + imm;
                         }
                         PC++;
                         break;
                     }
                     case 1:
                         if (status & Z_FLAG) {
-                            PC = address;
+                            PC = address_latch;
                         }
                         else {
                             PC++;
@@ -369,17 +377,17 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                         uint8_t magnitude = ~imm + 1;
 
                         if (sign) {
-                            address = (PC+1) - magnitude;
+                            address_latch = (PC+1) - magnitude;
                         }
                         else {
-                            address = (PC+1) + imm;
+                            address_latch = (PC+1) + imm;
                         }
                         PC++;
                         break;
                     }
                     case 1:
                         if ((status & Z_FLAG) < 1) {
-                            PC = address;
+                            PC = address_latch;
                         }
                         else {
                             PC++;
@@ -404,8 +412,39 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0x48: // PHA (Push A) - Push accumulator value to stack
+
+                switch (cycles) {
+                    case 2:
+                        Push(A);
+                        break;
+                    case 1:
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case 0x68: // PLA (Pull A) - Loads top of stack into the accumulator
+
+                switch (cycles) {
+                    case 3:
+                        A = Pull();
+                        break;
+                    case 2:
+                        SetZFLAG(A);
+                        SetNFLAG(A);
+                        break;
+                    case 1:
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+
             default:
-                throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)instruction));
+                throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)instruction_latch));
                 break;
         }
     }
@@ -413,6 +452,16 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
     void Store(uint16_t Address, uint8_t Value) {
         mem[Address] = Value;
+    }
+
+    void Push(uint8_t data) {
+        mem[0x0100 + SP] = data;
+        SP--;
+    }
+
+    uint8_t Pull() {
+        SP++;
+        return mem[0x0100 + SP];
     }
 
     void SetZFLAG(uint8_t reg) {
