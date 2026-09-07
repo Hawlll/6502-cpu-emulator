@@ -64,6 +64,9 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0xA5: // LDA (Zero Page addressing mode) (Load into Accumulator register) - take immediate, which is offset of zero page, load value from address and put into accumluator
                 return 3;
                 break;
+            case 0xB5: // LDA (Zero Page index addressing mode) (Load into Accummulator Register) - take immediate, which is offset of zero page, add the value from x register, load the value from that address and put into accummulator
+                return 4;
+                break;
             case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
                 return 2;
                 break;
@@ -75,6 +78,9 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
             case 0x85: // STA (Zero Page addressing mode) (Store Accumulator) - take value from accumulator and store into address formed by immediate offset of zero page
                 return 3;
+                break;
+            case 0x95: // STA (Zero Page index X addressing mode) (Store Accumulator) - take value from accumulator and store into address formed by the sum of the immediate offset of zero page and X register
+                return 4;
                 break;
             case 0x8E: // STX (Store X register) - take value from X register and store into 16 bit address formed with next two bytes
                 return 4;
@@ -175,11 +181,11 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 2:
-                        address = 0x0000 + Fetch(PC);
+                        address_latch = 0x0000 + Fetch(PC);
                         PC++;
                         break;
                     case 1:
-                        A = Read(address);
+                        A = Read(address_latch);
                         SetZFLAG(A);
                         SetNFLAG(A);
                         break;
@@ -188,6 +194,27 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0xB5: // LDA (Zero Page index X addressing mode) (Load into Accummulator Register) - take immediate, which is offset of zero page, add the value from x register, load the value from that address and put into accummulator
+
+                switch (cycles) {
+                    case 3:
+                        address_latch = 0x0000 + Fetch(PC);
+                        break;
+                    case 2: {
+                        uint8_t low_byte = (address_latch & 0x00FF) + X;
+                        address_latch  = 0x0000 + low_byte;
+                        break;
+                    }
+                    case 1:
+                        std::cout << std::format("{:#X}", (int)address_latch) << std::endl;
+                        A = Read(address_latch);
+                        SetZFLAG(A);
+                        SetNFLAG(A);
+                        break;
+                    default:
+                        break;
+                }
+                break;
 
             case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
 
@@ -244,11 +271,31 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 2:
-                        address = 0x0000 + Fetch(PC);
+                        address_latch = 0x0000 + Fetch(PC);
                         PC++;
                         break;
                     case 1:
-                        Store(address, A);
+                        Store(address_latch, A);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case 0x95: // STA (Zero Page index X addressing mode) (Store Accumulator) - take value from accumulator and store into address formed by the sum of the immediate offset of zero page and X register
+
+                switch (cycles) {
+                    case 3:
+                        address_latch = 0x0000 + Fetch(PC);
+                        PC++;
+                        break;
+                    case 2: {
+                        uint8_t low_byte = (address_latch & 0x00FF) + X;
+                        address_latch = 0x0000 + low_byte;
+                        break;
+                    }
+                    case 1:
+                        Store(address_latch, A);
                         break;
                     default:
                         break;
