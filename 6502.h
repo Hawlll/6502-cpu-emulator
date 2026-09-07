@@ -22,7 +22,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         A = 0x00;
         X = 0x00;
         Y = 0x00;
-        status = 0b00000000;
+        status = 0x00;
         N_FLAG = 0b10000000;
         Z_FLAG = 0b00000010;
         C_FLAG = 0b00000001;
@@ -73,6 +73,9 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 return 4;
                 break;
             case 0x69: // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
+                return 2;
+                break;
+            case 0xE9: // SBC  (Subtract with carry) take immediate value, inverse carry, and subtract from accumulator register
                 return 2;
                 break;
             case 0x18: // CLC (Clear Carry) - Clears the carry flag in status register
@@ -276,6 +279,29 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
             }
 
+            case 0xE9: // SBC (Subtract with Carry) - take immediate value, NOT carry, and subtract from accumulator register
+                       // It is NOT carry because its the flag is intrepreted as its inverse for substraction (C = 1 means no borrow, C = 0 means borrow happened)
+                       // That is why usually SEC is followed before SBC
+                switch (cycles) {
+                    case 1: {
+                        uint8_t imm = Fetch(PC);
+                        uint8_t carry = status & C_FLAG;
+                        uint8_t A_prev = A;
+
+                        A = A - imm - !carry;
+
+                        SetNFLAG(A);
+                        SetZFLAG(A);
+                        SetCFLAG( A_prev >= (imm + !carry) );
+                        SetVFLAG(((A_prev ^ A) & (A_prev ^ imm) & 0x80) != 0);
+                        PC++;
+                        break;
+
+                    }
+                    default:
+                        break;
+                }
+                break;
             case 0x18: // CLC (Clear Carry) - Clears the carry flag in status register
 
                 switch (cycles) {
@@ -542,8 +568,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                     case 2:
                         break;
                     case 1:
-                        SetBFLAG(true);
-                        Push(status);
+                        Push(status | 0b00110000);
                         break;
                     default:
                         break;
@@ -620,6 +645,15 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         }
         else {
             status &= ~C_FLAG;
+        }
+    }
+
+    void SetVFLAG(bool value) {
+        if (value) {
+            status |= V_FLAG;
+        }
+        else {
+            status &= ~V_FLAG;
         }
     }
 
