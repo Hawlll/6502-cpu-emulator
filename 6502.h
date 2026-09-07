@@ -52,10 +52,17 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         return value;
     }
 
+    uint8_t Read(uint16_t Address) {
+        return mem[Address];
+    }
+
     uint8_t Decode(uint8_t opcode) { // defined opcodes, return cycles
         switch (opcode) {
             case 0xA9: // LDA (Load into Accumulator register) - take immediate 1 byte after opcode and place into accumulator register
                 return 2;
+                break;
+            case 0xA5: // LDA (Zero Page addressing mode) (Load into Accumulator register) - take immediate, which is offset of zero page, load value from address and put into accumluator
+                return 3;
                 break;
             case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
                 return 2;
@@ -65,6 +72,9 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
             case 0x8D: // STA (Store Accumulator) - take value from accumulator and store into 16 bit address formed with next two bytes
                 return 4;
+                break;
+            case 0x85: // STA (Zero Page addressing mode) (Store Accumulator) - take value from accumulator and store into address formed by immediate offset of zero page
+                return 3;
                 break;
             case 0x8E: // STX (Store X register) - take value from X register and store into 16 bit address formed with next two bytes
                 return 4;
@@ -161,6 +171,23 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0xA5: // LDA (Zero Page addressing mode) (Load into Accumulator register) - take immediate, which is offset of zero page, load value from address and put into accumluator
+
+                switch (cycles) {
+                    case 2:
+                        address = 0x0000 + Fetch(PC);
+                        PC++;
+                        break;
+                    case 1:
+                        A = Read(address);
+                        SetZFLAG(A);
+                        SetNFLAG(A);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
 
             case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
 
@@ -212,6 +239,21 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
 
             }
+
+            case 0x85: // STA (Zero Page addressing mode) (Store Accumulator) - take value from accumulator and store into address formed by immediate offset of zero page
+
+                switch (cycles) {
+                    case 2:
+                        address = 0x0000 + Fetch(PC);
+                        PC++;
+                        break;
+                    case 1:
+                        Store(address, A);
+                        break;
+                    default:
+                        break;
+                }
+                break;
 
             case 0x8E: // STX (Store X register) - take value from X register and store into 16 bit address formed with next two bytes
 
