@@ -6,12 +6,14 @@ int main()
     CPU cpu;
     cpu.Initialize();
 
+    cpu.mem[0x9102] = 0x09;
     cpu.mem[0x8000] = 0xA2;
     cpu.mem[0x8001] = 0x05;
-    cpu.mem[0x8002] = 0xA9;
-    cpu.mem[0x8003] = 0x05;
-    cpu.mem[0x8004] = 0x95;
-    cpu.mem[0x8005] = 0xFF;
+    //cpu.mem[0x8002] = 0xA9;
+    //cpu.mem[0x8003] = 0x05;
+    cpu.mem[0x8002] = 0xBD;
+    cpu.mem[0x8003] = 0xFD;
+    cpu.mem[0x8004] = 0x90;
 
     cpu.Clock();
     cpu.Clock();
@@ -20,9 +22,8 @@ int main()
     cpu.Clock();
     cpu.Clock();
     cpu.Clock();
-    cpu.Clock();
 
-    std::cout << (int)cpu.mem[0x0004] << std::endl;
+    std::cout << (int)cpu.A << std::endl;
 
 
     //inline instruction - loop

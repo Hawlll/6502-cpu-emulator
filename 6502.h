@@ -10,8 +10,8 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
     uint8_t status; // Processor status register
     uint8_t N_FLAG; // negative flag
     uint8_t Z_FLAG; // zero flag
-    uint8_t C_FLAG; // carry flag (did operation result in needing another bit)
-    uint8_t V_FLAG; // overflow flag (did operation result in outside signed bit range)
+    uint8_t C_FLAG; // carry flag (unsigned over/under flow)
+    uint8_t V_FLAG; // overflow flag (signed over/under flow)
     uint8_t B_FLAG; // // break flag
     uint8_t cycles; // emulator representation, not programmatically visible, used to track cycles for instruction
     uint8_t instruction_latch; // emulator representation, not programmatically visible, used to store current opcode
@@ -67,6 +67,18 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0xB5: // LDA (Zero Page index addressing mode) (Load into Accummulator Register) - take immediate, which is offset of zero page, add the value from x register, load the value from that address and put into accummulator
                 return 4;
                 break;
+            case 0xBD: { // LDA (Absolute index X addressing mode) (Load into Accumulator register) - take value from sum of (absolute address formed by next two bytes) + (X register) and put into accumulator. grants another cycle if page cross
+                uint8_t low_byte = mem[PC+1];
+                uint8_t result = low_byte + X;
+                if (result >= low_byte) {
+                    return 4;
+
+                }
+                else{
+                    return 5;
+                }
+                break;
+            }
             case 0xA2: // LDX(Load into X register) - take immediate value and load into x register
                 return 2;
                 break;
@@ -82,6 +94,10 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0x95: // STA (Zero Page index X addressing mode) (Store Accumulator) - take value from accumulator and store into address formed by the sum of the immediate offset of zero page and X register
                 return 4;
                 break;
+            case 0x9D: { // STA (Absolute index X addressing mode) (Store Accumulator) - take value from accumulator and store into address formed by the next two bytes added to the X register
+                return 5;
+                break;
+            }
             case 0x8E: // STX (Store X register) - take value from X register and store into 16 bit address formed with next two bytes
                 return 4;
                 break;
@@ -199,6 +215,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 switch (cycles) {
                     case 3:
                         address_latch = 0x0000 + Fetch(PC);
+                        PC++;
                         break;
                     case 2: {
                         uint8_t low_byte = (address_latch & 0x00FF) + X;
@@ -206,7 +223,31 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                         break;
                     }
                     case 1:
-                        std::cout << std::format("{:#X}", (int)address_latch) << std::endl;
+                        A = Read(address_latch);
+                        SetZFLAG(A);
+                        SetNFLAG(A);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+
+            case 0xBD: // LDA (Absolute index X addressing mode) (Load into Accumulator register) - take value from sum of (absolute address formed by next two bytes) + (X register) and put into accumulator. grants another cycle if page cross
+
+                switch (cycles) {
+                    case 4:
+                        break; // extra cycle due to page cross
+                    case 3:
+                        address_latch = 0x0000 + Fetch(PC) + X;
+                        PC++;
+                        break;
+                    case 2:
+                        address_latch |= (Fetch(PC) << 8);
+                        PC++;
+                        break;
+                    case 1:
+                        std::cout << std::format("{:#X}", address_latch) << std::endl;
                         A = Read(address_latch);
                         SetZFLAG(A);
                         SetNFLAG(A);
@@ -296,6 +337,26 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                     }
                     case 1:
                         Store(address_latch, A);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case 0x9D: // STA (Absolute index X addressing mode) (Store Accumulator) - take value from accumulator and store into address formed by the next two bytes added to the X register
+
+                switch (cycles) {
+                    case 4:
+                        address_latch = 0x0000 + Fetch(PC) + X;
+                        PC++;
+                        break;
+                    case 3:
+                        address_latch |= (Fetch(PC) << 8);
+                        break;
+                    case 2:
+                        A = Read(address_latch);
+                        break;
+                    case 1:
                         break;
                     default:
                         break;
