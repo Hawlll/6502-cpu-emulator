@@ -16,6 +16,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
     uint8_t C_FLAG; // carry flag (unsigned over/under flow)
     uint8_t V_FLAG; // overflow flag (signed over/under flow)
     uint8_t B_FLAG; // // break flag
+    uint8_t I_FLAG; // interrupt flag
 
 
     void Reset(Bus& bus) { // reset vector
@@ -37,6 +38,8 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         C_FLAG = 0b00000001;
         Z_FLAG = 0b00000010;
         N_FLAG = 0b10000000;
+        I_FLAG = 0b00000100;
+
     }
 
     void Clock(Bus& bus) {
@@ -176,6 +179,12 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
             case 0x28: // PLP (Pull Processor Status) - Pull processor status from stack and load into status register
                 return 4;
+                break;
+            case 0x00: // BRK (Break) - push return address to stack, push processor status to stack, point PC to 0xFFFE (interrupt handler)
+                return 7;
+                break;
+            case 0x40: // RTI (Return from Interrupt) - pull return address from stack and set to PC, pull status from stack
+                return 6;
                 break;
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)opcode));
@@ -805,6 +814,56 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0x00: // BRK (Break) - push return address to stack, push processor status to stack, point PC to 0xFFFE (interrupt handler)
+
+                switch (cycles) {
+                    case 6:
+                        PC++;
+                        break;
+                    case 5:
+                        Push((PC & 0xFF00) >> 8, bus);
+                        break;
+                    case 4:
+                        Push(PC & 0x00FF, bus);
+                        break;
+                    case 3:
+                        Push(status | 0b00110000, bus);
+                        SetIFLAG(true);
+                        break;
+                    case 2:
+                        address_latch = 0x0000 + bus.Read(0xFFFE);
+                        break;
+                    case 1:
+                        address_latch |= bus.Read(0xFFFF) << 8;
+                        PC = address_latch;
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case 0x40: // RTI (Return from Interrupt) - pull return address from stack and set to PC, pull status from stack
+
+                switch (cycles) {
+                    case 5:
+                        status = Pull(bus) & 0b11001111;
+                        break;
+                    case 4:
+                        address_latch = 0x0000 + Pull(bus);
+                        break;
+                    case 3:
+                        address_latch |= Pull(bus) << 8;
+                        break;
+                    case 2:
+                        PC = address_latch;
+                        break;
+                    case 1:
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)instruction_latch));
                 break;
@@ -886,6 +945,15 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         }
         else {
             status &= ~B_FLAG;
+        }
+    }
+
+    void SetIFLAG(bool value) {
+        if (value) {
+            status |= I_FLAG;
+        }
+        else {
+            status &= ~I_FLAG;
         }
     }
 };

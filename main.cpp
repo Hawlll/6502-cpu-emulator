@@ -13,6 +13,10 @@ int main()
     bus.Write(0xFFFC, 0x00); // define reset vector
     bus.Write(0xFFFD, 0x80);
 
+    bus.Write(0xFFFE, 0x00); // define interrupt handler
+    bus.Write(0xFFFF, 0x90);
+
+
     cpu.Reset(bus);
 
 
