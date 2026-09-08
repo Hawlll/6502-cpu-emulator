@@ -10,7 +10,10 @@ int main()
     Video gpu;
     Bus bus(ram, gpu);
 
-    cpu.Initialize();
+    bus.Write(0xFFFC, 0x00); // define reset vector
+    bus.Write(0xFFFD, 0x80);
+
+    cpu.Reset(bus);
 
 
     //inline program - draw diagonal line

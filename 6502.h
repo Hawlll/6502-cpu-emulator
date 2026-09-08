@@ -8,30 +8,35 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
     uint8_t X; // Index X register
     uint8_t Y; // Index Y register
     uint8_t status; // Processor status register
+    uint8_t cycles; // emulator representation, not programmatically visible, used to track cycles for instruction
+    uint8_t instruction_latch; // emulator representation, not programmatically visible, used to store current opcode
+    uint16_t address_latch; // emulator representation, not programmatically visible, used to store constructed address
     uint8_t N_FLAG; // negative flag
     uint8_t Z_FLAG; // zero flag
     uint8_t C_FLAG; // carry flag (unsigned over/under flow)
     uint8_t V_FLAG; // overflow flag (signed over/under flow)
     uint8_t B_FLAG; // // break flag
-    uint8_t cycles; // emulator representation, not programmatically visible, used to track cycles for instruction
-    uint8_t instruction_latch; // emulator representation, not programmatically visible, used to store current opcode
-    uint16_t address_latch; // emulator representation, not programmatically visible, used to store constructed address
 
-    void Initialize() {
-        PC = 0x8000;
+
+    void Reset(Bus& bus) { // reset vector
+
+        uint8_t low_byte = bus.Read(0xFFFC);
+        uint8_t high_byte = bus.Read(0xFFFD);
+
+        PC = (high_byte << 8) + low_byte;
         A = 0x00;
         X = 0x00;
         Y = 0x00;
         status = 0x00;
-        N_FLAG = 0b10000000;
-        Z_FLAG = 0b00000010;
-        C_FLAG = 0b00000001;
-        V_FLAG = 0b01000000;
-        B_FLAG = 0b00010000;
         instruction_latch = 0x00;
         cycles = 0x00;
         address_latch = 0x0000;
         SP = 0xFD;
+        B_FLAG = 0b00010000;
+        V_FLAG = 0b01000000;
+        C_FLAG = 0b00000001;
+        Z_FLAG = 0b00000010;
+        N_FLAG = 0b10000000;
     }
 
     void Clock(Bus& bus) {
