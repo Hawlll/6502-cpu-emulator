@@ -68,7 +68,6 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 uint8_t result = low_byte + X;
                 if (result >= low_byte) {
                     return 4;
-
                 }
                 else{
                     return 5;
@@ -103,6 +102,9 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0x69: // ADC (Add with carry) - take immediate value, carry, and add into accumulator register
                 return 2;
                 break;
+            case 0x6D: // ADC (Absolute Addressing mode) - add value from address formed by next two bytes with carry into accumulator
+                return 4;
+                break;
             case 0xE9: // SBC  (Subtract with carry) take immediate value, inverse carry, and subtract from accumulator register
                 return 2;
                 break;
@@ -121,7 +123,13 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
             case 0xE8: // INX (Increment X) - Add one to the X register
                 return 2;
                 break;
+            case 0xC8: // INY (Increment Y) - Add one to the Y register
+                return 2;
+                break;
             case 0xCA: // DEX (Decrement X) - Subtract one from the X register
+                return 2;
+                break;
+            case 0x88: // DEY (Decrement Y) - Subtract one from the Y register
                 return 2;
                 break;
             case 0x4C: // JMP (Jump) - Update PC to address formed by next two bytes
@@ -363,7 +371,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 3:
-                        address_latch = Fetch(PC, bus);
+                        address_latch = 0x0000 + Fetch(PC, bus);
                         PC++;
                         break;
                     case 2:
@@ -382,7 +390,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
 
                 switch (cycles) {
                     case 3:
-                        address_latch = Fetch(PC, bus);
+                        address_latch = 0x0000 + Fetch(PC, bus);
                         PC++;
                         break;
                     case 2:
@@ -424,6 +432,36 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
 
             }
+
+
+            case 0x6D: // ADC (Absolute Addressing mode) - add value from address formed by next two bytes with carry into accumulator
+
+                switch (cycles) {
+                    case 3:
+                        address_latch = 0x0000 +  Fetch(PC, bus);
+                        PC++;
+                        break;
+                    case 2:
+                        address_latch |= (Fetch(PC, bus) << 8);
+                        PC++;
+                        break;
+                    case 1: {
+                        uint8_t carry = (status & C_FLAG) > 0;
+                        uint16_t operation_result = A + bus.Read(address_latch) + carry;
+                        uint8_t A_prev = A;
+
+                        A = operation_result & 0x00FF;
+
+                        SetNFLAG(A);
+                        SetZFLAG(A);
+                        SetCFLAG(operation_result);
+                        SetVFLAG(bus.Read(address_latch), A_prev, A);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                break;
 
             case 0xE9: // SBC (Subtract with Carry) - take immediate value, NOT carry, and subtract from accumulator register
                        // It is NOT carry because its the flag is intrepreted as its inverse for substraction (C = 1 means no borrow, C = 0 means borrow happened)
@@ -523,6 +561,19 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0xC8: // INY (Increment Y) - Add one to the Y register
+
+                switch (cycles) {
+                    case 1:
+                        Y += 1;
+                        SetZFLAG(Y);
+                        SetNFLAG(Y);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
             case 0xCA: // DEX (Decrement X) - Subtract one from the X register
 
                 switch (cycles) {
@@ -530,6 +581,19 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                         X -= 1;
                         SetZFLAG(X);
                         SetNFLAG(X);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+            case 0x88: // DEY (Decrement Y) - Subtract one from the Y register
+
+                switch (cycles) {
+                    case 1:
+                        Y -= 1;
+                        SetZFLAG(Y);
+                        SetNFLAG(Y);
                         break;
                     default:
                         break;

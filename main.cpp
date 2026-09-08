@@ -13,115 +13,122 @@ int main()
     cpu.Initialize();
 
 
-    //inline instruction - loop
+    //inline program - draw diagonal line
     /*loop
 
-      LDX
+      // Initialize A, X, Y to 0
+      LDA 0x00
+      LDX 0x00
+      LDY 0x00
 
-      CPX
-      BEQ => jump to address if zero flag is on
-      DEX
+      // write to gpu mapped memory
+      PHA
+      TAX
+      LDA 0x01
+      STA 0x00 0xE0
+      PLA
+
+      CMP
+      BEQ
+
+      LDX 0x00
+      JSR
+        INX
+        CPX 0x0F
+        BEQ
+        JMP
+      RTS
+      STX
+      ADC
+      STY
+      ADC
       JMP
+
+
     */
 
-    bus.Write(0x8000, 0xA9);
-    bus.Write(0x8001, 0x01);
-    cpu.Clock(bus);
-    cpu.Clock(bus);
+    bus.Write(0x8000, 0xA9); // LDA
+    bus.Write(0x8001, 0x00);
+
+    bus.Write(0x8002, 0xA2); // LDX
+    bus.Write(0x8003, 0x00);
+
+    bus.Write(0x8004, 0xA0); // LDY
+    bus.Write(0x8005, 0x01);
+
+    bus.Write(0x8006, 0x48); // PHA
+    bus.Write(0x8007, 0xAA); // TAX
+    bus.Write(0x8008, 0xA9); // LDA
+    bus.Write(0x8009, 0x01);
+    bus.Write(0x800A, 0x9D); // STA
+    bus.Write(0x800B, 0x00);
+    bus.Write(0x800C, 0xE0);
+
+    bus.Write(0x800D, 0x68); // PLA
+
+    bus.Write(0x800E, 0xC9); // CMP
+    bus.Write(0x800F, 0xFF);
+    bus.Write(0x8010, 0xF0); // BEQ
+    bus.Write(0x8011, 0x0F);
+
+    bus.Write(0x8012, 0xA2); // LDX
+    bus.Write(0x8013, 0x00);
+
+    bus.Write(0x8014, 0x20); // JSR
+    bus.Write(0x8015, 0x00);
+    bus.Write(0x8016, 0x81);
 
 
-    uint16_t test_vram_locs[] = {
-        0xE033, 0xE034, 0xE035, 0xE036,
+    bus.Write(0x8100, 0xE8); // INX
+    bus.Write(0x8101, 0xE0); // CPX
+    bus.Write(0x8102, 0x0F);
+    bus.Write(0x8103, 0xF0); // BEQ
+    bus.Write(0x8104, 0x03);
+    bus.Write(0x8105, 0x4C); // JMP
+    bus.Write(0x8106, 0x00);
+    bus.Write(0x8107, 0x81);
+    bus.Write(0x8108, 0x60); // RTS
 
-        0xE043,
-        0xE053,
-        0xE063,
-        0xE073,
-        0xE083,
-        0xE093,
-        0xE0A3,
-        0xE0B3,
+    bus.Write(0x8017, 0x8E); // STX
+    bus.Write(0x8018, 0x00);
+    bus.Write(0x8019, 0x90);
+    bus.Write(0x801A, 0x6D); // ADC
+    bus.Write(0x801B, 0x00);
+    bus.Write(0x801C, 0x90);
+    bus.Write(0x801D, 0x8C); // STY
+    bus.Write(0x801E, 0x00);
+    bus.Write(0x801F, 0x90);
+    bus.Write(0x8020, 0x6D); // ADC
+    bus.Write(0x8021, 0x00);
+    bus.Write(0x8022, 0x90);
+    bus.Write(0x8023, 0x4C); // JMP
+    bus.Write(0x8024, 0x06);
+    bus.Write(0x8025, 0x80);
 
-        0xE047,
-        0xE057,
-        0xE067,
 
-        0xE073, 0xE074, 0xE075, 0xE076,
 
-        0xE087,
-        0xE097,
-        0xE0A7,
+    int num_clocks = 0;
 
-        0xE0B3, 0xE0B4, 0xE0B5, 0xE0B6
-    };
+    while (true) {
 
-    for (size_t i = 0; i < std::size(test_vram_locs); i++) {
-        bus.Write(0x8002 + (3 * i), 0x8D);
-        bus.Write(0x8003 + (3 * i), test_vram_locs[i] & 0x00FF);
-        bus.Write(0x8004 + (3 * i), (test_vram_locs[i] & 0xFF00) >> 8);
-    }
-
-    for (int i = 0; i < (int)std::size(test_vram_locs) * 4; i++) {
         cpu.Clock(bus);
-    }
+        num_clocks++;
 
-    for (int x = 0; x < 16; x++) {
-        for (int y = 0; y < 16; y++) {
-            uint8_t val_in_vram = bus.Read(0xE000 + (x*16) + y);
-            if (val_in_vram == 0x01) {
-                std::cout << "#";
+        std::cout << "\033[2J\033[H";
+        std::cout << "Num Clocks: " << num_clocks <<  std::endl;
+        for (int x = 0; x < 16; x++) {
+            for (int y = 0; y < 16; y++) {
+                uint8_t val_in_vram = bus.Read(0xE000 + (x*16) + y);
+                if (val_in_vram == 0x01) {
+                    std::cout << "#";
+                }
+                else {
+                    std::cout << ".";
+                }
             }
-            else {
-                std::cout << ".";
-            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
     }
-
-//    uint8_t num_iterations = 0x01;
-//
-//
-//
-//    bus.Write(0x8000, 0xA2); // LDX
-//    bus.Write(0x8001, num_iterations);
-//    cpu.Clock(bus);
-//    cpu.Clock(bus);
-//
-//    bus.Write(0x8002, 0xE0); // CPX
-//    bus.Write(0x8003, 0x00);
-//
-//    bus.Write(0x8004, 0xF0); // BEQ
-//    bus.Write(0x8005, 0x09);
-//
-//    bus.Write(0x8006, 0xCA); // DEX
-//
-//    bus.Write(0x8007, 0x4C); // JMP
-//    bus.Write(0x8008, 0x02);
-//    bus.Write(0x8009, 0x80);
-//
-//    while (true) {
-//        char in;
-//        std::cout << "Type c to clock CPU: ";
-//        std::cin >> in;
-//
-//        if (in == 'c') {
-//            std::cout << std::endl;
-//            std::cout << "Cycles: " << (int)cpu.cycles << std::endl;
-//            std::cout << "X register: " << (int)cpu.X << std::endl;
-//            std::cout << "Program Counter: " << std::format("{:#X}\n", (int)cpu.PC);
-//            std::cout << "Status: ";
-//
-//
-//            for (int i = 7; i > -1; i--) {
-//                int on = (cpu.status & (1 << (i))) > 0;
-//                std::cout << on;
-//            }
-//            std::cout << std::endl;
-//            std::cout << std::endl;
-//            cpu.Clock(bus);
-//
-//        }
-//    }
 
     return 0;
 }
