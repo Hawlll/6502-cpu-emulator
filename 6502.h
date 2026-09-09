@@ -16,7 +16,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
     uint8_t C_FLAG; // carry flag (unsigned over/under flow)
     uint8_t V_FLAG; // overflow flag (signed over/under flow)
     uint8_t B_FLAG; // // break flag
-    uint8_t I_FLAG; // interrupt flag
+    uint8_t I_FLAG; // interrupt disabled flag
 
 
     void Reset(Bus& bus) { // reset vector
@@ -185,6 +185,12 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 break;
             case 0x40: // RTI (Return from Interrupt) - pull return address from stack and set to PC, pull status from stack
                 return 6;
+                break;
+            case 0x58: // CLI (Clear interrupt flag) - clears interrupt flag
+                return 2;
+                break;
+            case 0x78: // SEI (Set interrupt flag) - sets interrupt flag
+                return 2;
                 break;
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)opcode));
@@ -864,6 +870,29 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
                 }
                 break;
 
+            case 0x58: // CLI (Clear interrupt flag) - clears interrupt flag
+
+                switch (cycles) {
+                    case 1:
+                        SetIFLAG(false);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
+
+            case 0x78: // SEI (Set interrupt flag) - sets interrupt flag
+
+                switch (cycles) {
+                    case 1:
+                        SetIFLAG(true);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+
             default:
                 throw std::runtime_error("Instruction does not exist: " + std::format("{:#X}\n", (int)instruction_latch));
                 break;
@@ -878,6 +907,28 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
     uint8_t Pull(Bus& bus) {
         SP++;
         return bus.Read(0x0100 + SP);
+    }
+
+    void IRQ(Bus& bus) {
+        if ((status & I_FLAG) == 0) {
+            Push((PC & 0xFF00) << 8, bus);
+            Push(PC & 0x00FF, bus);
+            Push(status & 0b11001111, bus);
+            SetIFLAG(true);
+            address_latch = 0x0000 + bus.Read(0xFFFE);
+            address_latch |= bus.Read(0xFFFF) << 8;
+            PC = address_latch;
+        }
+    }
+
+    void NMI(Bus& bus) {
+        Push((PC & 0xFF00) << 8, bus);
+        Push(PC & 0x00FF, bus);
+        Push(status & 0b11001111, bus);
+        SetIFLAG(true);
+        address_latch = 0x0000 + bus.Read(0xFFFA);
+        address_latch |= bus.Read(0xFFFB) << 8;
+        PC = address_latch;
     }
 
     void SetZFLAG(uint8_t reg) {
