@@ -28,7 +28,7 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         A = 0x00;
         X = 0x00;
         Y = 0x00;
-        status = 0x00;
+        status = I_FLAG;
         instruction_latch = 0x00;
         cycles = 0x00;
         address_latch = 0x0000;
@@ -913,10 +913,10 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
         if ((status & I_FLAG) == 0) {
             Push((PC & 0xFF00) << 8, bus);
             Push(PC & 0x00FF, bus);
-            Push(status & 0b11001111, bus);
+            Push(status & 0b11101111, bus);
             SetIFLAG(true);
             address_latch = 0x0000 + bus.Read(0xFFFE);
-            address_latch |= bus.Read(0xFFFF) << 8;
+            address_latch |= bus.Read(0xFFFF) >> 8;
             PC = address_latch;
         }
     }
@@ -924,10 +924,10 @@ struct CPU { // emulated after 6502. 8 bit data, 16 bit memory address space. li
     void NMI(Bus& bus) {
         Push((PC & 0xFF00) << 8, bus);
         Push(PC & 0x00FF, bus);
-        Push(status & 0b11001111, bus);
+        Push(status & 0b11101111, bus);
         SetIFLAG(true);
         address_latch = 0x0000 + bus.Read(0xFFFA);
-        address_latch |= bus.Read(0xFFFB) << 8;
+        address_latch |= bus.Read(0xFFFB) >> 8;
         PC = address_latch;
     }
 
